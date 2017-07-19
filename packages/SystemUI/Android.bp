@@ -205,6 +205,7 @@ android_library {
     ],
     libs: [
         "keepanno-annotations",
+        "ims-common",
     ],
     manifest: "AndroidManifest.xml",
 
@@ -364,6 +365,7 @@ android_library {
         "android.test.base",
         "android.test.mock",
         "keepanno-annotations",
+        "ims-common",
     ],
     kotlincflags: ["-Xjvm-default=all"],
     aaptflags: [
@@ -501,6 +503,10 @@ android_app {
     system_ext_specific: true,
     certificate: "platform",
     privileged: true,
+
+    libs: [
+        "ims-common",
+    ],
 
     kotlincflags: ["-Xjvm-default=all"],
 

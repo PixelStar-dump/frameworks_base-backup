@@ -69,6 +69,11 @@
         android:icon="@drawable/ic_statusbar_wifi" />
 
     <com.android.systemui.tuner.StatusBarSwitch
+        android:icon="@drawable/ic_statusbar_volte"
+        android:key="ims"
+        android:title="@string/status_bar_ims" />
+        
+    <com.android.systemui.tuner.StatusBarSwitch
         android:key="ethernet"
         android:title="@string/status_bar_ethernet"
         android:icon="@drawable/ic_statusbar_ethernet" />
