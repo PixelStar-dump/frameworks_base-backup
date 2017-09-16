@@ -7442,5 +7442,7 @@ message MetricsEvent {
     // CUSTOM Metrics
     CUSTOM = 2772;
     CUSTOM_TILES = 2775;
+    PIXELSTAR = 2999;
+
   }
 }
