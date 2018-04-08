@@ -27,6 +27,7 @@ import com.android.systemui.qs.tiles.CPUInfoTile
 import com.android.systemui.qs.tiles.DataSwitchTile
 import com.android.systemui.qs.tiles.HeadsUpTile
 import com.android.systemui.qs.tiles.MonoToggleTile
+import com.android.systemui.qs.tiles.SmartPixelsTile
 import com.android.systemui.qs.tiles.SoundTile
 import com.android.systemui.qs.tiles.SoundSearchTile
 import com.android.systemui.qs.tiles.SyncTile
@@ -136,4 +137,10 @@ interface PixelstarModule {
     @IntoMap
     @StringKey(LiveDisplayTile.TILE_SPEC)
     fun bindLiveDisplayTile(liveDisplayTile: LiveDisplayTile): QSTileImpl<*>
+
+    /** Inject SmartPixelsTile into tileMap in QSModule */
+    @Binds
+    @IntoMap
+    @StringKey(SmartPixelsTile.TILE_SPEC)
+    fun bindSmartPixelsTile(smartPixelsTile: SmartPixelsTile): QSTileImpl<*>
 }
