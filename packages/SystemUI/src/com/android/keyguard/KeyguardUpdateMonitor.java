@@ -2260,7 +2260,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
 
         // Take a guess at initial SIM state, battery status and PLMN until we get an update
         mBatteryStatus = new BatteryStatus(BATTERY_STATUS_UNKNOWN, /* level= */ 100, /* plugged= */
-                0, CHARGING_POLICY_DEFAULT, /* maxChargingWattage= */0, /* present= */true, 0, 0, 0, false));
+                0, CHARGING_POLICY_DEFAULT, /* maxChargingWattage= */0, /* present= */true, 0, 0, 0, false);
 
         // Watch for interesting updates
         final IntentFilter filter = new IntentFilter();
