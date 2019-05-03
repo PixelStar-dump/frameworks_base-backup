@@ -35,6 +35,7 @@ import android.os.BatteryManager;
 import android.provider.Settings.Global;
 import android.provider.Settings.System;
 import android.util.ArrayMap;
+import android.text.TextUtils;
 
 import java.util.Map;
 
@@ -252,5 +253,6 @@ public class SystemSettingsValidators {
         VALIDATORS.put(System.NOTIFICATION_VIBRATION_PATTERN, new InclusiveIntegerRangeValidator(0, 5));
         VALIDATORS.put(System.CUSTOM_NOTIFICATION_VIBRATION_PATTERN, CUSTOM_VIBRATION_PATTERN_VALIDATOR);
         VALIDATORS.put(System.DOUBLE_TAP_SLEEP_GESTURE, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(System.LIVE_DISPLAY_HINTED, new InclusiveIntegerRangeValidator(-3, 1));
     }
 }
