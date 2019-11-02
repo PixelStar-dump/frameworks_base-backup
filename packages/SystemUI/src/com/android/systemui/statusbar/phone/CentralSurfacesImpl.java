@@ -139,6 +139,7 @@ import com.android.systemui.flags.Flags;
 import com.android.systemui.fragments.ExtensionFragmentListener;
 import com.android.systemui.fragments.FragmentHostManager;
 import com.android.systemui.fragments.FragmentService;
+import com.android.systemui.keyguard.KeyguardSliceProvider;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.KeyguardViewMediator;
 import com.android.systemui.keyguard.ScreenLifecycle;
@@ -236,6 +237,7 @@ import com.android.systemui.statusbar.policy.UserSwitcherController;
 import com.android.systemui.statusbar.window.StatusBarWindowController;
 import com.android.systemui.statusbar.window.StatusBarWindowStateController;
 import com.android.systemui.surfaceeffects.ripple.RippleShader.RippleShape;
+import com.android.systemui.tuner.TunerService;
 import com.android.systemui.util.DumpUtilsKt;
 import com.android.systemui.util.WallpaperController;
 import com.android.systemui.util.concurrency.DelayableExecutor;
@@ -278,12 +280,15 @@ import javax.inject.Provider;
  * {@link ActivityStarterImpl}
  */
 @SysUISingleton
-public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
+public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces, TunerService.Tunable {
 
     private static final String BANNER_ACTION_CANCEL =
             "com.android.systemui.statusbar.banner_action_cancel";
     private static final String BANNER_ACTION_SETUP =
             "com.android.systemui.statusbar.banner_action_setup";
+
+    private static final String PULSE_ON_NEW_TRACKS =
+            Settings.Secure.PULSE_ON_NEW_TRACKS;
 
     private static final int MSG_OPEN_SETTINGS_PANEL = 1002;
     private static final int MSG_LAUNCH_TRANSITION_TIMEOUT = 1003;
@@ -455,6 +460,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final StatusBarSignalPolicy mStatusBarSignalPolicy;
     private final StatusBarHideIconsForBouncerManager mStatusBarHideIconsForBouncerManager;
     private final Lazy<LightRevealScrimViewModel> mLightRevealScrimViewModelLazy;
+    private final TunerService mTunerService;
 
     protected GameSpaceManager mGameSpaceManager;
 
@@ -735,7 +741,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             Provider<FingerprintManager> fingerprintManager,
             ActivityStarter activityStarter,
             SceneContainerFlags sceneContainerFlags,
-            BurnInProtectionController burnInProtectionController
+            BurnInProtectionController burnInProtectionController,
+            TunerService tunerService
     ) {
         mContext = context;
         mNotificationsController = notificationsController;
@@ -842,6 +849,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mLockscreenShadeTransitionController = lockscreenShadeTransitionController;
         mStartingSurfaceOptional = startingSurfaceOptional;
         mDreamManager = dreamManager;
+        mTunerService = tunerService;
         lockscreenShadeTransitionController.setCentralSurfaces(this);
         statusBarWindowStateController.addListener(this::onStatusBarWindowStateChanged);
 
@@ -925,6 +933,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
         mKeyguardManager = (KeyguardManager) mContext.getSystemService(Context.KEYGUARD_SERVICE);
         mWallpaperSupported = mWallpaperManager.isWallpaperSupported();
+
+        mTunerService.addTunable(this, PULSE_ON_NEW_TRACKS);
 
         RegisterStatusBarResult result = null;
         try {
@@ -3103,6 +3113,20 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     }
 
     @Override
+    public void onTuningChanged(String key, String newValue) {
+        switch (key) {
+            case PULSE_ON_NEW_TRACKS:
+                boolean showPulseOnNewTracks =
+                        TunerService.parseIntegerSwitch(newValue, false);
+                KeyguardSliceProvider sliceProvider = KeyguardSliceProvider.getAttachedInstance();
+                if (sliceProvider != null)
+                    sliceProvider.setPulseOnNewTracks(showPulseOnNewTracks);
+                break;
+            default:
+                break;
+         }
+    }
+
     public GameSpaceManager getGameSpaceManager() {
         return mGameSpaceManager;
     }
