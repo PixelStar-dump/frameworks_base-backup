@@ -33,15 +33,26 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-/** @hide */
+/**
+ * @hide
+ */
 public final class AttestationHooks {
 
     private static final String TAG = "AttestationHooks";
-    private static final String DEVICE = "ro.pixelstar.device";
+    private static final String DEVICE = "ro.custom.device";
     private static final boolean DEBUG = false;
 
     private static final String PACKAGE_GPHOTOS = "com.google.android.apps.photos";
     private static final String PACKAGE_SNAPCHAT = "com.snapchat.android";
+
+    private static final Map<String, Object> sPixel5aProps = Map.of(
+        "BRAND", "google",
+        "MANUFACTURER", "Google",
+        "DEVICE", "barbet",
+        "PRODUCT", "barbet",
+        "MODEL", "Pixel 5a",
+        "FINGERPRINT", "google/barbet/barbet:14/AP2A.240805.005/12025142:user/release-keys"
+    );
 
     private static final Map<String, Object> sPixelXLProps = Map.of(
         "BRAND", "google",
@@ -52,17 +63,13 @@ public final class AttestationHooks {
         "FINGERPRINT", "google/marlin/marlin:10/QP1A.191005.007.A3/5972272:user/release-keys"
     );
 
-    private static final Map<String, Object> sPixel2Props = Map.of(
-        "BRAND", "google",
-        "MANUFACTURER", "Google",
-        "DEVICE", "walleye",
-        "PRODUCT", "walleye",
-        "MODEL", "Pixel 2",
-        "FINGERPRINT", "google/walleye/walleye:8.1.0/OPM1.171019.011/4448085:user/release-keys"
-    );
-
     // Codenames for currently supported Pixels by Google
     private static final String[] pixelCodenames = {
+            "komodo",
+            "caiman",
+            "tokay",
+            "comet",
+            "akita",
             "husky",
             "shiba",
             "felix",
@@ -92,22 +99,20 @@ public final class AttestationHooks {
 
         boolean isPixelDevice = Arrays.asList(pixelCodenames).contains(SystemProperties.get(DEVICE));
         if (packageName.equals(PACKAGE_GPHOTOS)) {
-            if (!SystemProperties.getBoolean("persist.sys.pixelprops.gphotos", false)) {
-                dlog("Photos spoofing disabled by system prop");
-                return;
-            } else {
-                dlog("Spoofing Pixel XL for: " + packageName);
+            if (SystemProperties.getBoolean("persist.sys.gphooks.enable", false)) {
                 sPixelXLProps.forEach(AttestationHooks::setPropValue);
+            } else {
+                if (!isPixelDevice) {
+                    sPixel5aProps.forEach(AttestationHooks::setPropValue);
+                }
             }
         }
 
         if (packageName.equals(PACKAGE_SNAPCHAT)) {
-            if (!SystemProperties.getBoolean("persist.sys.pixelprops.snapchat", true)) {
-                dlog("Snapchat spoofing disabled by system prop");
-                return;
-            } else {
-                dlog("Spoofing Pixel 2 for: " + packageName);
-                sPixel2Props.forEach(AttestationHooks::setPropValue);
+            if (SystemProperties.getBoolean("persist.sys.snaphooks.enable", true)) {
+                if (!isPixelDevice) {
+                    sPixelXLProps.forEach(AttestationHooks::setPropValue);
+                }
             }
         }
     }
