@@ -9,4 +9,6 @@
     
     <!-- Defines custom OEM sensor for pocket detection. -->
     <string name="config_pocketJudgeVendorSensorName"></string>
+    <bool name="config_pocketUseLightSensor">true</bool>
+    
 </resources>
