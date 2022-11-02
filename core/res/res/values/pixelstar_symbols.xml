@@ -5,6 +5,10 @@
 -->
 <resources>
 
+    <!-- Camera -->
+    <java-symbol type="array" name="config_cameraAuxPackageAllowList" />
+    <java-symbol type="array" name="config_cameraAuxPackageExcludeList" />
+    
     <!-- Whether device implements proximity sensor based checks to prevent
          accidental unlocks when the screen is off. -->
     <java-symbol type="bool" name="config_proximityCheckOnFpsUnlock" />
