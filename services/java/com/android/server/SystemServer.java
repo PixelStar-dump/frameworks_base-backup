@@ -237,6 +237,7 @@ import com.android.server.wm.ActivityTaskManagerService;
 import com.android.server.wm.CrossDeviceService;
 import com.android.server.wm.WindowManagerGlobalLock;
 import com.android.server.wm.WindowManagerService;
+import com.android.server.lineage.health.HealthInterfaceService;
 
 import dalvik.system.VMRuntime;
 
@@ -2657,7 +2658,12 @@ public final class SystemServer implements Dumpable {
             t.traceBegin("StartCustomDeviceConfigService");
             mSystemServiceManager.startService(CustomDeviceConfigService.class);
             t.traceEnd();
-        }    
+
+            t.traceBegin("StartHealthService");
+            mSystemServiceManager.startService(HealthInterfaceService.class);
+            t.traceEnd();
+        }
+
         t.traceBegin("StartMediaProjectionManager");
         mSystemServiceManager.startService(MediaProjectionManagerService.class);
         t.traceEnd();
