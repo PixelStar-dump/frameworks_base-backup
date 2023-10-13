@@ -469,6 +469,9 @@ public final class SystemServer implements Dumpable {
     private static final String DEVICE_LOCK_APEX_PATH =
             "/apex/com.android.devicelock/javalib/service-devicelock.jar";
 
+    private static final String POCKETLOCK_SERVICE_CLASS =
+            "org.rising.server.PocketModeService";
+
     private static final String TETHERING_CONNECTOR_CLASS = "android.net.ITetheringConnector";
 
     private static final String APP_LOCK_SERVICE_CLASS =
@@ -3020,6 +3023,10 @@ public final class SystemServer implements Dumpable {
 
         t.traceBegin("AppCompatOverridesService");
         mSystemServiceManager.startService(APP_COMPAT_OVERRIDES_SERVICE_CLASS);
+        t.traceEnd();
+
+        t.traceBegin("StartPocketLockService");
+        mSystemServiceManager.startService(POCKETLOCK_SERVICE_CLASS);
         t.traceEnd();
 
         t.traceBegin("HealthConnectManagerService");

@@ -13208,6 +13208,17 @@ public final class Settings {
         public static final String MEDIA_CONTROLS_ALWAYS_SHOW_TIME = "media_controls_always_show_time";
 
         /**
+         * Parameter for Pocket Mode
+         *
+         * The value "1", Enable Pocket Mode
+         * The value "0", Disables Pocket Mode
+         *
+         * @hide
+         */
+        public static final String POCKET_MODE_ENABLED
+                = "pocket_mode_enabled";
+
+        /**
          * These entries are considered common between the personal and the managed profile,
          * since the managed profile doesn't get to change them.
          */
