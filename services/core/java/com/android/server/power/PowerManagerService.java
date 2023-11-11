@@ -363,6 +363,9 @@ public final class PowerManagerService extends SystemService
 
     private boolean mButtonLightOnKeypressOnly;
 
+    private PowerManager mPowerManager;
+    private PowerManager.WakeLock mPlugWakeLock;
+
     private final InattentiveSleepWarningController mInattentiveSleepWarningOverlayController;
     private final AmbientDisplaySuppressionController mAmbientDisplaySuppressionController;
 
@@ -1216,6 +1219,11 @@ public final class PowerManagerService extends SystemService
         mPermissionCheckerWrapper = mInjector.createPermissionCheckerWrapper();
         mPowerPropertiesWrapper = mInjector.createPowerPropertiesWrapper();
         mDeviceConfigProvider = mInjector.createDeviceConfigParameterProvider();
+
+        mPowerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        if (mPowerManager != null) {
+            mPlugWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "DeviceWakeupOnCharge");
+        }
 
         mPowerGroupWakefulnessChangeListener = new PowerGroupWakefulnessChangeListener();
 
@@ -2788,8 +2796,17 @@ public final class PowerManagerService extends SystemService
             return false;
         }
 
-        // Otherwise wake up!
-        return true;
+        try {
+             if (mPlugWakeLock != null){
+                mPlugWakeLock.acquire();
+             }
+            // Otherwise wake up!
+            return true;
+        } finally {
+            if (mPlugWakeLock != null){
+                mPlugWakeLock.release();
+            }
+        }
     }
 
     /**
