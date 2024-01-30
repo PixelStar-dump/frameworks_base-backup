@@ -49,7 +49,10 @@ import java.util.Random;
 
 public class PixelPropsUtils {
 
-    private static final String PACKAGE_FINSKY = "com.android.vending";
+    private static final String PACKAGE_FINSKY = "com.google.android.finsky";
+    private static final String PACKAGE_FINSKY_REGULAR = PACKAGE_FINSKY + ".regular";
+    private static final String PACKAGE_FINSKY_STABLE = PACKAGE_FINSKY + ".stable";
+    private static final String PACKAGE_STORE = "com.android.vending";
     private static final String PACKAGE_GMS = "com.google.android.gms";
     private static final String PROCESS_GMS_UNSTABLE = PACKAGE_GMS + ".unstable";
     private static final String PACKAGE_GPHOTOS = "com.google.android.apps.photos";
@@ -335,7 +338,7 @@ public class PixelPropsUtils {
         Map<String, Object> propsToChange = new HashMap<>();
         sProcessName = processName;
         sIsGms = packageName.equals(PACKAGE_GMS) && processName.equals(PROCESS_GMS_UNSTABLE);
-        sIsFinsky = packageName.equals(PACKAGE_FINSKY);
+        sIsFinsky = packageName.equals(PACKAGE_FINSKY) || packageName.equals(PACKAGE_STORE) || packageName.equals(PACKAGE_FINSKY_STABLE) || packageName.equals(PACKAGE_FINSKY_REGULAR);
 
         if (sIsGms) {
             if (shouldTryToCertifyDevice()) {
