@@ -893,7 +893,7 @@ public class ApplicationPackageManager extends PackageManager {
             if (Arrays.asList(featuresNexus).contains(name)) return true;
         }
         if (name != null && Arrays.asList(featuresTensor).contains(name)
-                && !Arrays.asList(pTensorCodenames).contains(SystemProperties.get("org.evolution.device"))) {
+                && !Arrays.asList(pTensorCodenames).contains(SystemProperties.get("ro.pixelstar.device"))) {
             return false;
         }
         if (packageName != null
