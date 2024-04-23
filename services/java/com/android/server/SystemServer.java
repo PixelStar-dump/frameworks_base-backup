@@ -2673,8 +2673,7 @@ public final class SystemServer implements Dumpable {
             // CustomDeviceConfigService
             t.traceBegin("StartCustomDeviceConfigService");
             mSystemServiceManager.startService(CustomDeviceConfigService.class);
-            t.traceEnd();
-        }    
+            t.traceEnd();   
 
             // LiveDisplay
             if (context.getResources().getBoolean(
