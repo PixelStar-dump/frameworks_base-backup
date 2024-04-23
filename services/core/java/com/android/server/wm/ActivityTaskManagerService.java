@@ -290,7 +290,7 @@ import com.android.wm.shell.Flags;
 import com.android.internal.util.pixelstar.PixelPropsUtils;
 import com.android.server.usage.AppStandbyInternal;
 
-import com.android.internal.util.pixys.PixelPropsUtils;
+import com.android.internal.util.pixelstar.PixelPropsUtils;
 import com.android.internal.util.custom.cutout.CutoutFullscreenController;
 
 import java.io.BufferedReader;
