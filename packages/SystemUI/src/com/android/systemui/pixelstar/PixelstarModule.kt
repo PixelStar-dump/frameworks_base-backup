@@ -40,7 +40,7 @@ import dagger.multibindings.IntoMap
 import dagger.multibindings.StringKey
 
 @Module
-interface pixelstarModule {
+interface PixelstarModule {
     /** Inject AmbientDisplayTile into tileMap in QSModule */
     @Binds
     @IntoMap

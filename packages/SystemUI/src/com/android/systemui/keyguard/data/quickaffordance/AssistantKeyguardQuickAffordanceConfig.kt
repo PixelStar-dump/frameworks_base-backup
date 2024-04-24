@@ -31,7 +31,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
-import com.android.internal.util.pixys.PixysUtils
+import com.android.internal.util.custom.CustomUtils
 
 @SysUISingleton
 class AssistantKeyguardQuickAffordanceConfig
@@ -61,7 +61,7 @@ constructor(
             )
 
     override suspend fun getPickerScreenState(): KeyguardQuickAffordanceConfig.PickerScreenState {
-        return if (PixysUtils.isPackageInstalled(context, "com.openai.chatgpt")) {
+        return if (CustomUtils.isPackageInstalled(context, "com.openai.chatgpt")) {
             super.getPickerScreenState()
         } else {
             KeyguardQuickAffordanceConfig.PickerScreenState.UnavailableOnDevice
