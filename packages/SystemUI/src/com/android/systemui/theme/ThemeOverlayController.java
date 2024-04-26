@@ -590,7 +590,7 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
                     whenAsleepHandler.run();
                 }
             });
-        }
+
         // To set props without needing an overlay change, Usually the props are only set when you first change wallpaper i.e after overlay change.
         // we wish to avoid this, call setBootColorProps at the start of service, this will set props on boot so by the time you first reboot,
         // boot colors would already be there and bootanim would be colored.
