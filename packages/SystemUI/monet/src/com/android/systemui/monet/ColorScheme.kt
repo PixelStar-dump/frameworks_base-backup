@@ -335,7 +335,7 @@ internal constructor(
     chromaFactor: Float = 1f
 ) {
     val seedCam: Cam = Cam.fromInt(seedColor)
-    val allShades: List<Int> = spec.shades(seedCam, luminanceFactor, chromaFactor)
+    val allShades: List<Int> = spec.shades(seedCam)
     val allShadesMapped: Map<Int, Int> = SHADE_KEYS.zip(allShades).toMap()
     val baseColor: Int
 
@@ -387,8 +387,7 @@ class ColorScheme(
     val style: Style = Style.TONAL_SPOT,
     val luminanceFactor: Float = 1f,
     val chromaFactor: Float = 1f,
-    val tintBackground: Boolean = false,
-    @ColorInt val bgSeed: Int? = null
+    val tintBackground: Boolean = false
 ) {
 
     val accent1: TonalPalette
@@ -398,8 +397,8 @@ class ColorScheme(
     val neutral2: TonalPalette
 
     constructor(@ColorInt seed: Int, darkTheme: Boolean, style: Style = Style.TONAL_SPOT,
-            luminanceFactor: Float = 1f, chromaFactor: Float = 1f, tintBackground: Boolean = false):
-            this(seed, darkTheme, style, luminanceFactor, chromaFactor, tintBackground, null)
+            luminanceFactor: Float = 1f, chromaFactor: Float = 1f):
+            this(seed, darkTheme, style, luminanceFactor, chromaFactor, false)
 
     constructor(@ColorInt seed: Int, darkTheme: Boolean) : this(seed, darkTheme, Style.TONAL_SPOT)
 
@@ -410,10 +409,9 @@ class ColorScheme(
         style: Style = Style.TONAL_SPOT,
         luminanceFactor: Float = 1f,
         chromaFactor: Float = 1f,
-        tintBackground: Boolean = false,
-        bgSeed: Int? = null
+        tintBackground: Boolean = false
     ) : this(getSeedColor(wallpaperColors, style != Style.CONTENT), darkTheme, style,
-             luminanceFactor, chromaFactor, tintBackground, bgSeed)
+             luminanceFactor, chromaFactor, tintBackground)
 
     val allHues: List<TonalPalette>
         get() {
@@ -454,26 +452,13 @@ class ColorScheme(
                 seed
             }
 
-        val proposedBgSeedCam = Cam.fromInt(if (bgSeed == null) seed else bgSeed)
-        val bgSeedArgb =
-            if (bgSeed == null) {
-                seedArgb
-            } else if (bgSeed == Color.TRANSPARENT) {
-                GOOGLE_BLUE
-            } else if (style != Style.CONTENT && proposedBgSeedCam.chroma < 5) {
-                GOOGLE_BLUE
-            } else {
-                bgSeed
-            }
-
         accent1 = TonalPalette(style.coreSpec.a1, seedArgb, luminanceFactor, chromaFactor)
         accent2 = TonalPalette(style.coreSpec.a2, seedArgb)
         accent3 = TonalPalette(style.coreSpec.a3, seedArgb)
-        neutral1 = TonalPalette(style.coreSpec.n1, bgSeedArgb,
-                if (tintBackground) luminanceFactor else 1f,
+        neutral1 = TonalPalette(style.coreSpec.n1, seedArgb)
+        neutral2 = TonalPalette(style.coreSpec.n2, seedArgb,
+                if (tintBackground) luminanceFactor else 1f
                 if (tintBackground) chromaFactor else 1f)
-        neutral2 = TonalPalette(style.coreSpec.n2, bgSeedArgb)
-                
     }
 
     val shadeCount
