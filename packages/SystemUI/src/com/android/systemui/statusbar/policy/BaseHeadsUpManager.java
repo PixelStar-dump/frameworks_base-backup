@@ -22,18 +22,11 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.Notification;
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.os.Handler;
-import android.os.UserHandle;
-import android.provider.Settings;
 import android.util.ArrayMap;
 import android.view.accessibility.AccessibilityManager;
-import android.view.Gravity;
-import android.view.View;
-import android.widget.TextView;
-import android.widget.Toast;
 
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.UiEvent;
@@ -49,8 +42,6 @@ import com.android.systemui.util.concurrency.DelayableExecutor;
 import com.android.systemui.util.settings.GlobalSettings;
 import com.android.systemui.util.time.SystemClock;
 
-import com.android.systemui.SysUIToast;
-
 import java.io.PrintWriter;
 
 /**
@@ -60,6 +51,7 @@ import java.io.PrintWriter;
 public abstract class BaseHeadsUpManager extends AlertingNotificationManager implements
         HeadsUpManager {
     private static final String TAG = "HeadsUpManager";
+    private static final String SETTING_HEADS_UP_SNOOZE_LENGTH_MS = "heads_up_snooze_length_ms";
 
     protected final ListenerSet<OnHeadsUpChangedListener> mListeners = new ListenerSet<>();
 
@@ -107,30 +99,29 @@ public abstract class BaseHeadsUpManager extends AlertingNotificationManager imp
         mMinimumDisplayTime = resources.getInteger(R.integer.heads_up_notification_minimum_time);
         mStickyForSomeTimeAutoDismissTime = resources.getInteger(
                 R.integer.sticky_heads_up_notification_time);
-        int defaultHeadsUpNotificationDecayMs =
-                resources.getInteger(R.integer.heads_up_notification_decay);
-        mAutoDismissTime = Settings.System.getIntForUser(context.getContentResolver(),
-                Settings.System.HEADS_UP_TIMEOUT,
-                defaultHeadsUpNotificationDecayMs, UserHandle.USER_CURRENT);
-        mSnoozeLengthMs = Settings.System.getIntForUser(context.getContentResolver(),
-                Settings.System.HEADS_UP_NOTIFICATION_SNOOZE,
-                context.getResources().getInteger(R.integer.heads_up_default_snooze_length_ms),
-                UserHandle.USER_CURRENT);
+        mAutoDismissTime = resources.getInteger(R.integer.heads_up_notification_decay);
         mTouchAcceptanceDelay = resources.getInteger(R.integer.touch_acceptance_delay);
         mSnoozedPackages = new ArrayMap<>();
+        int defaultSnoozeLengthMs =
+                resources.getInteger(R.integer.heads_up_default_snooze_length_ms);
+
+        mSnoozeLengthMs = globalSettings.getInt(SETTING_HEADS_UP_SNOOZE_LENGTH_MS,
+                defaultSnoozeLengthMs);
         ContentObserver settingsObserver = new ContentObserver(handler) {
             @Override
             public void onChange(boolean selfChange) {
-                mSnoozedPackages.clear();
-                mSnoozeLengthMs = Settings.System.getIntForUser(context.getContentResolver(),
-                        Settings.System.HEADS_UP_NOTIFICATION_SNOOZE,
-                        context.getResources().getInteger(R.integer.heads_up_default_snooze_length_ms),
-                        UserHandle.USER_CURRENT);
+                final int packageSnoozeLengthMs = globalSettings.getInt(
+                        SETTING_HEADS_UP_SNOOZE_LENGTH_MS, -1);
+                if (packageSnoozeLengthMs > -1 && packageSnoozeLengthMs != mSnoozeLengthMs) {
+                    mSnoozeLengthMs = packageSnoozeLengthMs;
+                    mLogger.logSnoozeLengthChange(packageSnoozeLengthMs);
+                }
             }
         };
-        context.getContentResolver().registerContentObserver(
-                Settings.System.getUriFor(Settings.System.HEADS_UP_NOTIFICATION_SNOOZE), false,
-                settingsObserver, UserHandle.USER_ALL);
+        globalSettings.registerContentObserver(
+                globalSettings.getUriFor(SETTING_HEADS_UP_SNOOZE_LENGTH_MS),
+                /* notifyForDescendants = */ false,
+                settingsObserver);
     }
 
     /**
@@ -266,27 +257,6 @@ public abstract class BaseHeadsUpManager extends AlertingNotificationManager imp
             String snoozeKey = snoozeKey(packageName, mUser);
             mLogger.logPackageSnoozed(snoozeKey);
             mSnoozedPackages.put(snoozeKey, mSystemClock.elapsedRealtime() + mSnoozeLengthMs);
-            if (mSnoozeLengthMs != 0) {
-                String appName = null;
-                try {
-                    appName = (String) mContext.getPackageManager().getApplicationLabel(
-                        mContext.getPackageManager().getApplicationInfo(packageName,
-                            PackageManager.GET_META_DATA));
-                } catch (PackageManager.NameNotFoundException e) {
-                    appName = packageName;
-                }
-                if (mSnoozeLengthMs == 60000) {
-                    Toast toast = SysUIToast.makeText(mContext,
-                    mContext.getString(R.string.heads_up_snooze_message_one_minute, appName),
-                            Toast.LENGTH_LONG);
-                    toast.show();
-                } else {
-                    Toast toast = SysUIToast.makeText(mContext,
-                    mContext.getString(R.string.heads_up_snooze_message, appName,
-                    mSnoozeLengthMs / 60 / 1000), Toast.LENGTH_LONG);
-                    toast.show();
-                }
-            }
         }
     }
 
@@ -487,14 +457,6 @@ public abstract class BaseHeadsUpManager extends AlertingNotificationManager imp
 
         protected boolean mExpanded;
         protected boolean mWasUnpinned;
-
-        public void updateEntry(boolean updatePostTime) {
-            mAutoDismissTime = Settings.System.getIntForUser(mContext.getContentResolver(),
-                Settings.System.HEADS_UP_TIMEOUT,
-                mContext.getResources().getInteger(R.integer.heads_up_notification_decay),
-                UserHandle.USER_CURRENT);
-            super.updateEntry(updatePostTime, "updateEntry");
-        }
 
         @Override
         public boolean isSticky() {
