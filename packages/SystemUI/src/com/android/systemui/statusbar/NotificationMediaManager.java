@@ -95,8 +95,10 @@ public class NotificationMediaManager implements Dumpable {
 
     private final SysuiColorExtractor mColorExtractor;
 
+    private StatusBarStateController mStatusBarStateController;
     private boolean mIslandEnabled;
     private boolean mIslandNowPlayingEnabled;
+    private NotificationUtils notifUtils;
 
     private final MediaController.Callback mMediaListener = new MediaController.Callback() {
         @Override
