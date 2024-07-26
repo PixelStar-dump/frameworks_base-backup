@@ -6269,7 +6269,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mKeyguardDelegate.onStartedGoingToSleep(pmSleepReason);
         }
         if (mPocketMode != null) {
-            mPocketMode.setDozeState(isDozeMode());
             mPocketMode.onInteractiveChanged(false);
         }
     }
@@ -6346,7 +6345,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mCameraGestureTriggered = false;
 
         if (mPocketMode != null) {
-            mPocketMode.setDozeState(isDozeMode());
             mPocketMode.onInteractiveChanged(true);
         }
     }
