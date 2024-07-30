@@ -37,10 +37,11 @@
 
             <TextView
                 android:id="@+id/build"
+                android:textDirection="locale"
+                android:textAlignment="viewStart"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:clickable="true"
                 android:singleLine="true"
                 android:background="@drawable/btn_chip"
                 android:paddingTop="8dp"
@@ -52,6 +53,13 @@
                 android:textAppearance="@style/TextAppearance.QS.TileLabel.DataUsage"
                 android:textColor="?android:attr/textColorPrimaryInverse"
                 android:visibility="gone" />
+
+            <View
+                android:id="@+id/spacer"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1" />
+
 
             <com.android.systemui.qs.PageIndicator
                 android:id="@+id/footer_page_indicator"
