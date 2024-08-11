@@ -1990,7 +1990,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     private void handleScreenShot(@WindowManager.ScreenshotSource int source) {
         if (!mPocketLockShowing) {
-            mDefaultDisplayPolicy.takeScreenshot(source);
+            mDefaultDisplayPolicy.takeScreenshot(source, userId);
         }
     }
 
