@@ -38,7 +38,7 @@ import android.util.Log;
 import android.view.WindowManager;
 
 import com.android.internal.R;
-import com.android.internal.util.custom.Utils;
+import com.android.internal.util.custom.CustomUtils;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -268,7 +268,7 @@ public final class PixelPropsUtils {
 
         String packageName = "com.goolag.pif";
 
-        if (!Utils.isPackageInstalled(context, packageName)) {
+        if (!CustomUtils.isPackageInstalled(context, packageName)) {
             Log.e(TAG, "'" + packageName + "' is not installed.");
             return;
         }
