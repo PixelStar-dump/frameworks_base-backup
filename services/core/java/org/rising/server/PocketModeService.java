@@ -58,7 +58,8 @@ public class PocketModeService extends SystemService {
 
     public static final String ACTION_POCKET_STATE_CHANGED = "org.rising.server.action.POCKET_STATE_CHANGED";
     public static final String EXTRA_IN_POCKET = "in_pocket";
-    
+    private static final String BATTERY_FRIENDLY_POCKET_MODE_ENABLED = "battery_friendly_pocket_mode_enabled";
+
     private static final long DISPLAY_OFF_DELAY = 3000;
     private Handler mDisplayOffHandler = new Handler();
     private Runnable mDisplayOffRunnable = new Runnable() {
@@ -112,12 +113,14 @@ public class PocketModeService extends SystemService {
     
     private boolean mPocketModeEnabled;
     private boolean mAlwaysOnPocketModeEnabled;
+    private boolean mBatteryFriendlyPocketModeEnabled;
 
     private PocketModeService(Context context) {
         super(context);
         mContext = context;
         mPocketModeEnabled = isPocketModeEnabled();
         mAlwaysOnPocketModeEnabled = isAlwaysOnPocketMode();
+        mBatteryFriendlyPocketModeEnabled = isBatteryFriendlyPocketModeEnabled();
     }
     
     public static synchronized PocketModeService getInstance(Context context) {
@@ -149,6 +152,13 @@ public class PocketModeService extends SystemService {
         return Settings.Secure.getIntForUser(
                 mContext.getContentResolver(),
                 ALWAYS_ON_POCKET_MODE_ENABLED,
+                0, ActivityManager.getCurrentUser()) == 1;
+    }
+
+    private boolean isBatteryFriendlyPocketModeEnabled() {
+        return Settings.Secure.getIntForUser(
+                mContext.getContentResolver(),
+                BATTERY_FRIENDLY_POCKET_MODE_ENABLED,
                 0, ActivityManager.getCurrentUser()) == 1;
     }
 
@@ -287,11 +297,16 @@ public class PocketModeService extends SystemService {
     }
 
     public void detect(Float prox, Float light, float[] g, Integer inc) {
-        if (mAlwaysOnPocketModeEnabled) return;
+        if (mBatteryFriendlyPocketModeEnabled && !isDeviceOnKeyguard()) {
+            // In battery-friendly mode, do not use sensors if the device is not on the lock screen
+            return;
+        }
+
+        // Apply detection logic regardless of battery-friendly mode if the device is on the lock screen
         boolean isProxInPocket = mProximitySensor != null && prox != -1f && prox < PROXIMITY_THRESHOLD;
         boolean isLightInPocket = mLightSensor != null && light != -1f && light < LIGHT_THRESHOLD;
         boolean isGravityInPocket = mAccelerometerSensor != null && g != null && g.length == 3 && g[1] < GRAVITY_THRESHOLD;
-        boolean isInclinationInPocket= mAccelerometerSensor != null && inc != -1 && (inc > MIN_INCLINATION || inc < MAX_INCLINATION);
+        boolean isInclinationInPocket = mAccelerometerSensor != null && inc != -1 && (inc > MIN_INCLINATION || inc < MAX_INCLINATION);
 
         mIsInPocket = isProxInPocket;
         if (!mIsInPocket) {
@@ -337,15 +352,18 @@ public class PocketModeService extends SystemService {
                     UserHandle.USER_ALL);
             updatePocketModeSettings();
         }
+    
         void updatePocketModeSettings() {
             mPocketModeEnabled = isPocketModeEnabled();
             mAlwaysOnPocketModeEnabled = isAlwaysOnPocketMode();
-             if (mPocketModeEnabled) {
+            mBatteryFriendlyPocketModeEnabled = isBatteryFriendlyPocketModeEnabled();
+            if (mPocketModeEnabled) {
                 registerListeners();
-             } else {
+            } else {
                 unregisterListeners();
-             }
+            }
         }
+
         @Override
         public void onChange(boolean selfChange) {
             updatePocketModeSettings();
