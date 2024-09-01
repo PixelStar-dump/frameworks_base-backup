@@ -190,8 +190,12 @@ public class PocketModeService extends SystemService {
         if ((show && mAlwaysOnPocketModeEnabled || mIsInPocket) 
             && !mIsOverlayUserUnlocked && mPocketModeEnabled) {
             showOverlay();
+            if (mBatteryFriendlyPocketModeEnabled && isDeviceOnKeyguard()) {
+                registerListeners();
+            }
         } else {
             hideOverlay();
+            unregisterListeners(); // Unregister sensors when overlay is hidden
         }
     }
 
@@ -357,12 +361,19 @@ public class PocketModeService extends SystemService {
             mPocketModeEnabled = isPocketModeEnabled();
             mAlwaysOnPocketModeEnabled = isAlwaysOnPocketMode();
             mBatteryFriendlyPocketModeEnabled = isBatteryFriendlyPocketModeEnabled();
+
             if (mPocketModeEnabled) {
-                registerListeners();
+                if (mBatteryFriendlyPocketModeEnabled && !isDeviceOnKeyguard()) {
+                    // Do not register listeners if Battery Friendly mode is enabled and device is not on the lock screen
+                    unregisterListeners();
+                } else {
+                    registerListeners();
+                }
             } else {
                 unregisterListeners();
             }
         }
+
 
         @Override
         public void onChange(boolean selfChange) {
