@@ -187,12 +187,10 @@ public class PocketModeService extends SystemService {
             return;
         }
         mIsOverlayUserUnlocked = false;
-        if ((show && mAlwaysOnPocketModeEnabled || mIsInPocket) 
+        if ((show && mAlwaysOnPocketModeEnabled || mIsInPocket) || (mBatteryFriendlyPocketModeEnabled && isDeviceOnKeyguard())
             && !mIsOverlayUserUnlocked && mPocketModeEnabled) {
-            showOverlay();
-            if (mBatteryFriendlyPocketModeEnabled && isDeviceOnKeyguard()) {
-                registerListeners();
-            }
+            showOverlay(); 
+            registerListeners();
         } else {
             hideOverlay();
             unregisterListeners(); // Unregister sensors when overlay is hidden
@@ -302,27 +300,25 @@ public class PocketModeService extends SystemService {
 
     public void detect(Float prox, Float light, float[] g, Integer inc) {
         if (mBatteryFriendlyPocketModeEnabled && !isDeviceOnKeyguard()) {
-            // In battery-friendly mode, do not use sensors if the device is not on the lock screen
             return;
-        }
-
-        // Apply detection logic regardless of battery-friendly mode if the device is on the lock screen
-        boolean isProxInPocket = mProximitySensor != null && prox != -1f && prox < PROXIMITY_THRESHOLD;
-        boolean isLightInPocket = mLightSensor != null && light != -1f && light < LIGHT_THRESHOLD;
-        boolean isGravityInPocket = mAccelerometerSensor != null && g != null && g.length == 3 && g[1] < GRAVITY_THRESHOLD;
-        boolean isInclinationInPocket = mAccelerometerSensor != null && inc != -1 && (inc > MIN_INCLINATION || inc < MAX_INCLINATION);
-
-        mIsInPocket = isProxInPocket;
-        if (!mIsInPocket) {
-            mIsInPocket = isLightInPocket && isGravityInPocket && isInclinationInPocket;
-        }
-        if (!mIsInPocket) {
-            mIsInPocket = isGravityInPocket && isInclinationInPocket;
-        }
-        if (mIsInPocket && !mIsOverlayUserUnlocked) {
-            showOverlay();
         } else {
-            hideOverlay();
+            boolean isProxInPocket = mProximitySensor != null && prox != -1f && prox < PROXIMITY_THRESHOLD;
+            boolean isLightInPocket = mLightSensor != null && light != -1f && light < LIGHT_THRESHOLD;
+            boolean isGravityInPocket = mAccelerometerSensor != null && g != null && g.length == 3 && g[1] < GRAVITY_THRESHOLD;
+            boolean isInclinationInPocket = mAccelerometerSensor != null && inc != -1 && (inc > MIN_INCLINATION || inc < MAX_INCLINATION);
+
+            mIsInPocket = isProxInPocket;
+            if (!mIsInPocket) {
+                mIsInPocket = isLightInPocket && isGravityInPocket && isInclinationInPocket;
+            }
+            if (!mIsInPocket) {
+                mIsInPocket = isGravityInPocket && isInclinationInPocket;
+            }
+            if (mIsInPocket && !mIsOverlayUserUnlocked) {
+                showOverlay();
+            } else {
+                hideOverlay();
+            }
         }
     }
 
