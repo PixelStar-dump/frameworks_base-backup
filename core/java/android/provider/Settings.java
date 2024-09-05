@@ -6613,12 +6613,6 @@ public final class Settings {
         public static final String TORCH_POWER_BUTTON_GESTURE = "torch_power_button_gesture";
 
         /**
-         * Stores the array name of the values currently used for SpoofBuildGms
-         * @hide
-         */
-        public static final String PPU_SPOOF_BUILD_GMS_ARRAY = "ppu_spoof_build_gms_array";
-        
-        /**
          * Whether to show advanced reboot options in power menu
          * @hide
          */
