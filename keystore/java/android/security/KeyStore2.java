@@ -33,7 +33,7 @@ import android.system.keystore2.KeyEntryResponse;
 import android.system.keystore2.ResponseCode;
 import android.util.Log;
 
-import com.android.internal.util.everest.AttestationHooks;
+import com.android.internal.util.custom.AttestationHooks;
 
 import java.util.Calendar;
 
