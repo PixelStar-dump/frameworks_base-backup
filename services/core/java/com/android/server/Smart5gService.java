@@ -17,11 +17,11 @@
 package com.android.server;
 
 import static android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED;
+import static android.provider.Settings.Global.MOBILE_DATA;
 import static android.provider.Settings.System.SMART_5G;
 import static android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID;
 import static android.telephony.TelephonyManager.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED;
 import static android.telephony.TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_POWER;
-import static android.telephony.TelephonyManager.NETWORK_TYPE_BITMASK_NR;
 
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
@@ -33,29 +33,41 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.os.BatteryManager;
 import android.os.Handler;
 import android.os.HandlerExecutor;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
+import android.telephony.SignalStrength;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.util.Slog;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 
-/* not smart enough yet, but we're getting there */
+/* Not smart enough yet, but we're getting there */
 public class Smart5gService extends SystemService {
 
     private static final String TAG = "Smart5gService";
     private static final boolean DEBUG = true;
 
-    private static final NetworkRequest MOBILE_NETWORK_REQUEST =
+    // from org.codeaurora.telephony.utils.EnhancedRadioCapabilityResponse
+    private static final int NETWORK_TYPE_NR_NSA = 20; // = TelephonyManager.NETWORK_TYPE_NR
+    private static final int NETWORK_TYPE_NR_SA = 21;
+    private static final long NETWORK_TYPE_BITMASK_NR_NSA = (1 << (NETWORK_TYPE_NR_NSA -1));
+    private static final long NETWORK_TYPE_BITMASK_NR_SA = (1 << (NETWORK_TYPE_NR_SA -1));
+    private static final long NETWORK_TYPE_BITMASK_NR =
+            (NETWORK_TYPE_BITMASK_NR_NSA | NETWORK_TYPE_BITMASK_NR_SA);
+
+    private static final NetworkRequest INTERNET_NETWORK_REQUEST =
             new NetworkRequest.Builder()
-            .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .addCapability(NetworkCapabilities.NET_CAPABILITY_FOREGROUND)
             .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
@@ -71,9 +83,11 @@ public class Smart5gService extends SystemService {
     private ConnectivityManager mConnectivityManager;
     private PowerManager mPowerManager;
 
-    private boolean mIsMobileDataActive, mIsPowerSaveMode;
+    private boolean mIsOnMobileData, mIsPowerSaveMode;
     private int[] mActiveSubIds = new int[0];
     private int mDefaultDataSubId = INVALID_SUBSCRIPTION_ID;
+    
+    private boolean mIsScreenOff;
 
     private final ContentObserver mSettingObserver = new ContentObserver(mHandler) {
         @Override
@@ -105,6 +119,19 @@ public class Smart5gService extends SystemService {
                         update();
                     }
                     break;
+                case Intent.ACTION_SCREEN_OFF:
+                    mIsScreenOff = true;
+                    dlog("screen turned off");
+                    update();
+                    break;
+                case Intent.ACTION_SCREEN_ON:
+                    mIsScreenOff = false;
+                    dlog("screen turned on");
+                    update();
+                    break;
+                case Intent.ACTION_BATTERY_CHANGED:
+                    update();
+                    break;
                 default:
                     Slog.e(TAG, "Unhandled intent: " + action);
             }
@@ -113,20 +140,31 @@ public class Smart5gService extends SystemService {
 
     private final ConnectivityManager.NetworkCallback mNetworkCallback =
             new ConnectivityManager.NetworkCallback() {
-        @Override
-        public void onAvailable(Network network) {
-            dlog("NetworkCallback: connected to mobile network");
-            if (!mIsMobileDataActive) {
-                mIsMobileDataActive = true;
-                update();
-            }
-        }
+        Map<Network, NetworkCapabilities> mNetworkCaps = new HashMap<>();
 
         @Override
         public void onLost(Network network) {
-            dlog("NetworkCallback: disconnected from mobile network");
-            if (mIsMobileDataActive) {
-                mIsMobileDataActive = false;
+            dlog("NetworkCallback: onLost");
+            mNetworkCaps.remove(network);
+            refresh();
+        }
+
+        @Override
+        public void onCapabilitiesChanged(Network network, NetworkCapabilities caps) {
+            dlog("NetworkCallback: onCapabilitiesChanged");
+            mNetworkCaps.put(network, caps);
+            refresh();
+        }
+
+        private void refresh() {
+            final boolean isInternetConnected = !mNetworkCaps.isEmpty();
+            final boolean isMobileDataActive = mNetworkCaps.values().stream()
+                    .anyMatch(nc -> nc.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR));
+            dlog("NetworkCallback: isInternetConnected:" + isInternetConnected
+                    + " isMobileDataActive:" + isMobileDataActive);
+            final boolean isOnMobileData = isMobileDataActive || !isInternetConnected;
+            if (isOnMobileData != mIsOnMobileData) {
+                mIsOnMobileData = isOnMobileData;
                 update();
             }
         }
@@ -147,6 +185,8 @@ public class Smart5gService extends SystemService {
                     dlog("registering content observer for subId " + subId);
                     mContext.getContentResolver().registerContentObserver(
                             Settings.System.getUriFor(SMART_5G + subId), false, mSettingObserver);
+                    mContext.getContentResolver().registerContentObserver(
+                            Settings.Global.getUriFor(MOBILE_DATA + subId), false, mSettingObserver);
                 }
                 mActiveSubIds = subs;
                 update();
@@ -177,17 +217,38 @@ public class Smart5gService extends SystemService {
             dlog("onBootPhase PHASE_BOOT_COMPLETED");
             mIsPowerSaveMode = mPowerManager.isPowerSaveMode();
             mDefaultDataSubId = mSubManager.getDefaultDataSubscriptionId();
-            final IntentFilter filter = new IntentFilter(ACTION_POWER_SAVE_MODE_CHANGED);
+            final IntentFilter filter = new IntentFilter();
+            filter.addAction(ACTION_POWER_SAVE_MODE_CHANGED);
             filter.addAction(ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED);
+            filter.addAction(Intent.ACTION_SCREEN_OFF);
+            filter.addAction(Intent.ACTION_SCREEN_ON);
+            filter.addAction(Intent.ACTION_BATTERY_CHANGED);
             mContext.registerReceiver(mIntentReceiver, filter);
-            mConnectivityManager.registerNetworkCallback(MOBILE_NETWORK_REQUEST, mNetworkCallback);
+            mConnectivityManager.registerNetworkCallback(INTERNET_NETWORK_REQUEST, mNetworkCallback);
             mSubManager.addOnSubscriptionsChangedListener(mExecutor, mSubListener);
         }
     }
 
     private boolean isEnabled(int subId) {
-        return Settings.System.getIntForUser(mContext.getContentResolver(), SMART_5G + subId, 1,
+        return Settings.System.getIntForUser(mContext.getContentResolver(), SMART_5G + subId, 0,
                 UserHandle.USER_CURRENT) == 1;
+    }
+
+    private boolean isMobileDataEnabled(int subId) {
+        return Settings.Global.getInt(mContext.getContentResolver(), MOBILE_DATA + subId, 1) == 1;
+    }
+
+    private static long getSupportedNrBitmask(TelephonyManager tm, int subId) {
+        if ((tm.getSupportedRadioAccessFamily() & NETWORK_TYPE_BITMASK_NR) != 0) {
+            dlog("subId " + subId + " supports 5g EnhancedRadioCapability");
+            return NETWORK_TYPE_BITMASK_NR;
+        } else if ((tm.getSupportedRadioAccessFamily() & NETWORK_TYPE_BITMASK_NR_NSA) != 0) {
+            dlog("subId " + subId + " supports 5g AOSP");
+            return NETWORK_TYPE_BITMASK_NR_NSA;
+        } else {
+            dlog("subId " + subId + " does not support 5g!");
+            return 0;
+        }
     }
 
     private synchronized void update() {
@@ -197,20 +258,18 @@ public class Smart5gService extends SystemService {
         }
         for (int subId : mActiveSubIds) {
             final TelephonyManager tm = mTelephonyManager.createForSubscriptionId(subId);
-            if ((tm.getSupportedRadioAccessFamily() & NETWORK_TYPE_BITMASK_NR) == 0) {
-                dlog("update: break, subId " + subId + " does not support 5g!");
-                break;
-            }
+            final long supportedNrBitmask = getSupportedNrBitmask(tm, subId);
+            if (supportedNrBitmask == 0) return;
             long allowedNetworkTypes = tm.getAllowedNetworkTypesForReason(
                     ALLOWED_NETWORK_TYPES_REASON_POWER);
-            final boolean is5gAllowed = (allowedNetworkTypes & NETWORK_TYPE_BITMASK_NR) != 0;
+            final boolean is5gAllowed = (allowedNetworkTypes & supportedNrBitmask) != 0;
             final boolean shouldDisable = shouldDisable5g(subId);
             dlog("update: subId=" + subId + " is5gAllowed=" + is5gAllowed + " shouldDisable="
                     + shouldDisable);
             if (shouldDisable && is5gAllowed) {
-                allowedNetworkTypes &= ~NETWORK_TYPE_BITMASK_NR;
+                allowedNetworkTypes &= ~supportedNrBitmask;
             } else if (!shouldDisable && !is5gAllowed) {
-                allowedNetworkTypes |= NETWORK_TYPE_BITMASK_NR;
+                allowedNetworkTypes |= supportedNrBitmask;
             } else {
                 return;
             }
@@ -221,17 +280,61 @@ public class Smart5gService extends SystemService {
 
     private boolean shouldDisable5g(int subId) {
         if (!isEnabled(subId)) {
-            dlog("shouldDisable5g: setting is disabled for subId " + subId);
+            dlog("shouldDisable5g: smart 5g is disabled for subId " + subId);
             return false;
+        } else if (!isMobileDataEnabled(subId)) {
+            dlog("shouldDisable5g: mobile data is disabled for subId " + subId);
+            return true;
+        } else if (mIsScreenOff) {
+            dlog("shouldDisable5g: screen is off");
+            return true;
+        } else if (isConservativeMode() && isLowSignal(subId)) {
+            dlog("shouldDisable5g: conservative mode with low signal");
+            return true;
+        } else if (isConnectedToWifi()) { // if both wifi/data are enabled for e.g smart download feature on some apps
+            dlog("shouldDisable5g: connected to wifi");
+            return true;
+        } else if (isBatteryLow()) {
+            dlog("shouldDisable5g: battery is low");
+            return true;
         }
         dlog("shouldDisable5g: subId=" + subId + " mIsPowerSaveMode=" + mIsPowerSaveMode
-                + " mIsMobileDataActive=" + mIsMobileDataActive + " mDefaultDataSubId="
+                + " mIsOnMobileData=" + mIsOnMobileData + " mDefaultDataSubId="
                 + mDefaultDataSubId);
         return mIsPowerSaveMode // battery saver mode
-                || !mIsMobileDataActive // we aren't on mobile data
-                // we are on mobile data but this isn't the default data sim
-                || (mIsMobileDataActive && mDefaultDataSubId != INVALID_SUBSCRIPTION_ID
-                    && subId != mDefaultDataSubId);
+                || !mIsOnMobileData // we aren't on mobile data
+                // this isn't the default data sim
+                || (mDefaultDataSubId != INVALID_SUBSCRIPTION_ID && subId != mDefaultDataSubId);
+    }
+
+    private boolean isConservativeMode() {
+        String devicePowerMode = SystemProperties.get("persist.sys.device_power_mode", "");
+        return "conservative".equals(devicePowerMode);
+    }
+    
+    private boolean isLowSignal(int subId) {
+        SignalStrength signalStrength = mTelephonyManager.createForSubscriptionId(subId)
+                .getSignalStrength();
+        if (signalStrength == null) {
+            dlog("isLowSignal: SignalStrength is null");
+            return false;
+        }
+        int level = signalStrength.getLevel();
+        dlog("isLowSignal: Signal level is " + level);
+        return level <= SignalStrength.SIGNAL_STRENGTH_POOR;
+    }
+    
+    private boolean isConnectedToWifi() {
+        NetworkCapabilities capabilities = mConnectivityManager.getNetworkCapabilities(
+                mConnectivityManager.getActiveNetwork());
+        return capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+    }
+    
+    private boolean isBatteryLow() {
+        BatteryManager batteryManager = (BatteryManager) mContext.getSystemService(Context.BATTERY_SERVICE);
+        int batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+        dlog("isBatteryLow: Battery level is " + batteryLevel + "%");
+        return batteryLevel < 10;
     }
 
     private static void dlog(String msg) {
