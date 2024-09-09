@@ -48,6 +48,8 @@ import android.view.WindowManager;
 import com.android.internal.R;
 import com.android.server.SystemService;
 
+import org.rising.server.BFPocketMode;
+
 public class PocketModeService extends SystemService {
 
     private static final float PROXIMITY_THRESHOLD = 1.0f;
@@ -335,17 +337,30 @@ public class PocketModeService extends SystemService {
                     UserHandle.USER_ALL);
             mContext.getContentResolver().registerContentObserver(Settings.Secure.getUriFor(POCKET_MODE_ENABLED), false, this,
                     UserHandle.USER_ALL);
+            mContext.getContentResolver().registerContentObserver(Settings.Secure.getUriFor(BATTERY_FRIENDLY_POCKET_MODE_ENABLED), false, this, 
+                    UserHandle.USER_ALL);
             updatePocketModeSettings();
         }
         void updatePocketModeSettings() {
             mPocketModeEnabled = isPocketModeEnabled();
             mAlwaysOnPocketModeEnabled = isAlwaysOnPocketMode();
+            boolean batteryFriendlyPocketModeEnabled = Settings.Secure.getIntForUser(mContext.getContentResolver(), 
+                BATTERY_FRIENDLY_POCKET_MODE_ENABLED, 0, ActivityManager.getCurrentUser()) == 1;
+            
              if (mPocketModeEnabled) {
                 registerListeners();
              } else {
                 unregisterListeners();
              }
+
+            Intent bfPocketModeIntent = new Intent(mContext, BFPocketMode.class);
+            if (batteryFriendlyPocketModeEnabled) {
+                mContext.startService(bfPocketModeIntent);
+            } else {
+                mContext.stopService(bfPocketModeIntent);
+            }
         }
+
         @Override
         public void onChange(boolean selfChange) {
             updatePocketModeSettings();
