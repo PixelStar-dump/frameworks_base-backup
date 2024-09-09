@@ -44,7 +44,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-
+import android.util.Log;
 import com.android.internal.R;
 import com.android.server.SystemService;
 
@@ -77,6 +77,7 @@ public class PocketModeService extends SystemService {
     private float proximitySensorValue;
     private float lightSensorValue;
     private int inclinationAngle;
+    private static final String TAG = "PocketModeSrc";
 
     private Context mContext;
     private View mOverlayView;
@@ -87,12 +88,16 @@ public class PocketModeService extends SystemService {
     private TelecomManager mTelecomManager;
 
     private BroadcastReceiver mScreenStateReceiver;
+
     private SettingsObserver mSettingsObserver;
 
     private static final String ALWAYS_ON_POCKET_MODE_ENABLED = "always_on_pocket_mode_enabled";
     private static final String POCKET_MODE_ENABLED = "pocket_mode_enabled";
     private final Handler mHandler = new Handler();
     
+    private static final String BATTERY_FRIENDLY_POCKET_MODE_ENABLED = "battery_friendly_pocket_mode_enabled";
+    private boolean mBatteryFriendlyPocketModeEnabled;
+
     private static PocketModeService instance;
 
     private KeyguardManager mKeyguardManager;
@@ -101,6 +106,7 @@ public class PocketModeService extends SystemService {
     private Sensor mProximitySensor;
     private Sensor mLightSensor;
 
+    boolean mIsInBfPocket;
     boolean mIsInPocket;
     boolean mIsOverlayUserUnlocked;
     private boolean mShowing = false;
@@ -112,6 +118,8 @@ public class PocketModeService extends SystemService {
     
     private boolean mPocketModeEnabled;
     private boolean mAlwaysOnPocketModeEnabled;
+
+    private boolean mIsScreenOn = true;
 
     private PocketModeService(Context context) {
         super(context);
@@ -170,18 +178,65 @@ public class PocketModeService extends SystemService {
         mGestureDetector = null;
         mOverlayView.setOnTouchListener(null);
     }
-    
+
     public void onInteractiveChanged(boolean show) {
-        if (!mPocketModeEnabled && mShowing) {
-            hideOverlay();
-            return;
+
+        if (mBatteryFriendlyPocketModeEnabled) {
+            // Battery Friendly Pocket Mode: Handle sensors based on screen state
+            if (show && mIsInBfPocket && !mIsOverlayUserUnlocked) {
+                showOverlay();
+                Log.d(TAG, "Battery Friendly Mode: Overlay shown and sensors enabled");
+            } else if (mShowing) {
+                hideOverlay();
+                Log.d(TAG, "Battery Friendly Mode: Overlay hidden and sensors disabled");
+            }
+            return;  // Exit after handling battery-friendly mode
         }
-        mIsOverlayUserUnlocked = false;
+
+        if (!mBatteryFriendlyPocketModeEnabled) {
+            mIsOverlayUserUnlocked = false;
+        }
+
+        // Traditional pocket mode behavior
         if ((show && mAlwaysOnPocketModeEnabled || mIsInPocket) 
             && !mIsOverlayUserUnlocked && mPocketModeEnabled) {
             showOverlay();
-        } else {
+        } else if (!mPocketModeEnabled && mShowing) {
             hideOverlay();
+        }
+    }
+
+    private final BroadcastReceiver mScreenStateBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (Intent.ACTION_SCREEN_ON.equals(intent.getAction())) {
+                mIsScreenOn = true;
+                Log.d(TAG, "Screen is ON");
+            } else if (Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) {
+                mIsScreenOn = false;
+                Log.d(TAG, "Screen is OFF");
+            }
+        }
+    };
+
+    private void enableSensorsForBatteryFriendlyMode() {
+        // Enable only the necessary sensors for battery-friendly mode
+        if (mProximitySensor != null) {
+            mSensorManager.registerListener(mPocketModeListener, mProximitySensor, SensorManager.SENSOR_DELAY_NORMAL);
+        }
+    }
+
+    private void disableSensors() {
+        if (mProximitySensor != null) {
+            mSensorManager.unregisterListener(mPocketModeListener, mProximitySensor);
+        } 
+        
+        if (mLightSensor != null) {
+            mSensorManager.unregisterListener(mPocketModeListener, mLightSensor);
+        } 
+        
+        if (mAccelerometerSensor != null) {
+            mSensorManager.unregisterListener(mPocketModeListener, mAccelerometerSensor);
         }
     }
 
@@ -287,19 +342,59 @@ public class PocketModeService extends SystemService {
     }
 
     public void detect(Float prox, Float light, float[] g, Integer inc) {
+        // If always-on pocket mode is enabled, we don't need to process further
         if (mAlwaysOnPocketModeEnabled) return;
+
+        // Handle Battery Friendly Pocket Mode
+        if (mBatteryFriendlyPocketModeEnabled && isDeviceOnKeyguard() && mIsScreenOn) {
+            // Combine proximity, light, and accelerometer for better accuracy
+            boolean isBfProxInPocket = mProximitySensor != null && prox != -1f && prox < PROXIMITY_THRESHOLD;
+            boolean isBfLightInPocket = mLightSensor != null && light != -1f && light < LIGHT_THRESHOLD;
+            boolean isBfGravityInPocket = mAccelerometerSensor != null && g != null && g.length == 3 && g[1] < GRAVITY_THRESHOLD;
+            boolean isBfInclinationInPocket = mAccelerometerSensor != null && inc != -1 && (inc > MIN_INCLINATION && inc < MAX_INCLINATION);
+
+            // Combine all sensor data for pocket detection
+            mIsInBfPocket = isBfProxInPocket || isBfLightInPocket || isBfGravityInPocket || isBfInclinationInPocket;
+
+            // Log sensor data for debugging
+            Log.d(TAG, "Battery Friendly Mode: ProxInPocket = " + isBfProxInPocket + 
+                    ", LightInPocket = " + isBfLightInPocket + 
+                    ", GravityInPocket = " + isBfGravityInPocket + 
+                    ", InclinationInPocket = " + isBfInclinationInPocket);
+
+            // Show overlay if all conditions indicate the phone is in a pocket
+            if (mIsInBfPocket && !mIsOverlayUserUnlocked && isDeviceOnKeyguard() && mIsScreenOn) {
+                showOverlay();
+                Log.d(TAG, "Battery Friendly Mode: Overlay shown");
+            } else {
+                hideOverlay();
+                Log.d(TAG, "Battery Friendly Mode: Overlay hidden");
+            }
+            return;  // Exit after handling battery-friendly mode
+
+        } else if (mBatteryFriendlyPocketModeEnabled && !mIsScreenOn) {
+            disableSensors();
+            return;
+        }
+
+        // Traditional pocket mode behavior
         boolean isProxInPocket = mProximitySensor != null && prox != -1f && prox < PROXIMITY_THRESHOLD;
         boolean isLightInPocket = mLightSensor != null && light != -1f && light < LIGHT_THRESHOLD;
         boolean isGravityInPocket = mAccelerometerSensor != null && g != null && g.length == 3 && g[1] < GRAVITY_THRESHOLD;
-        boolean isInclinationInPocket= mAccelerometerSensor != null && inc != -1 && (inc > MIN_INCLINATION || inc < MAX_INCLINATION);
+        boolean isInclinationInPocket = mAccelerometerSensor != null && inc != -1 && (inc > MIN_INCLINATION || inc < MAX_INCLINATION);
 
+        // Check proximity first
         mIsInPocket = isProxInPocket;
+
+        // If proximity doesn't indicate pocket mode, check the other conditions
         if (!mIsInPocket) {
             mIsInPocket = isLightInPocket && isGravityInPocket && isInclinationInPocket;
         }
         if (!mIsInPocket) {
             mIsInPocket = isGravityInPocket && isInclinationInPocket;
         }
+
+        // Show or hide overlay based on pocket detection and user unlock state
         if (mIsInPocket && !mIsOverlayUserUnlocked) {
             showOverlay();
         } else {
@@ -324,6 +419,11 @@ public class PocketModeService extends SystemService {
         createOverlayView(mContext);
         mSettingsObserver = new SettingsObserver(new Handler());
         mSettingsObserver.observe();
+
+        IntentFilter screenStateFilter = new IntentFilter();
+        screenStateFilter.addAction(Intent.ACTION_SCREEN_ON);
+        screenStateFilter.addAction(Intent.ACTION_SCREEN_OFF);
+        mContext.registerReceiver(mScreenStateBroadcastReceiver, screenStateFilter);
     }
 
     class SettingsObserver extends ContentObserver {
@@ -335,17 +435,26 @@ public class PocketModeService extends SystemService {
                     UserHandle.USER_ALL);
             mContext.getContentResolver().registerContentObserver(Settings.Secure.getUriFor(POCKET_MODE_ENABLED), false, this,
                     UserHandle.USER_ALL);
+            mContext.getContentResolver().registerContentObserver(Settings.Secure.getUriFor(BATTERY_FRIENDLY_POCKET_MODE_ENABLED), false, this, 
+                    UserHandle.USER_ALL);
             updatePocketModeSettings();
         }
+
         void updatePocketModeSettings() {
             mPocketModeEnabled = isPocketModeEnabled();
             mAlwaysOnPocketModeEnabled = isAlwaysOnPocketMode();
-             if (mPocketModeEnabled) {
+            mBatteryFriendlyPocketModeEnabled = isBatteryFriendlyPocketModeEnabled();
+            if (mPocketModeEnabled || (mBatteryFriendlyPocketModeEnabled && isDeviceOnKeyguard() && mIsScreenOn)) {
                 registerListeners();
-             } else {
+            } else {
                 unregisterListeners();
-             }
+            }
         }
+
+        private boolean isBatteryFriendlyPocketModeEnabled() {
+            return Settings.Secure.getIntForUser(mContext.getContentResolver(), BATTERY_FRIENDLY_POCKET_MODE_ENABLED, 0, ActivityManager.getCurrentUser()) == 1;
+        }
+
         @Override
         public void onChange(boolean selfChange) {
             updatePocketModeSettings();
@@ -426,6 +535,22 @@ public class PocketModeService extends SystemService {
     }
     
     public boolean isDeviceInPocket() {
-        return mIsInPocket && !mIsOverlayUserUnlocked;
+        return (mIsInPocket || mIsInBfPocket) && !mIsOverlayUserUnlocked;
     }
+
+    @Override
+    public void onBootPhase(int phase) {
+        if (phase == PHASE_BOOT_COMPLETED) {
+            // Register the receiver after boot
+            IntentFilter screenStateFilter = new IntentFilter();
+            screenStateFilter.addAction(Intent.ACTION_SCREEN_ON);
+            screenStateFilter.addAction(Intent.ACTION_SCREEN_OFF);
+            mContext.registerReceiver(mScreenStateBroadcastReceiver, screenStateFilter);
+        } else if (phase == PHASE_SHUTDOWN) {
+            // Unregister the receiver during shutdown
+            mContext.unregisterReceiver(mScreenStateBroadcastReceiver);
+            Log.d(TAG, "BroadcastReceiver unregistered during shutdown.");
+        }
+    }
+
 }
