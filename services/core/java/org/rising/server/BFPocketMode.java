@@ -1,5 +1,6 @@
 package org.rising.server;
 
+import android.app.ActivityManager;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -72,7 +73,7 @@ public class BFPocketMode extends Service {
         return Settings.Secure.getIntForUser(getContentResolver(), 
             BATTERY_FRIENDLY_POCKET_MODE_ENABLED, 0, ActivityManager.getCurrentUser()) == 1;
     }
-    
+
     @Override
     public void onDestroy() {
         disableSensors();

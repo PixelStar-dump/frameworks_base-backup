@@ -49,7 +49,6 @@ import com.android.internal.R;
 import com.android.server.SystemService;
 
 import org.rising.server.BFPocketMode;
-
 public class PocketModeService extends SystemService {
 
     private static final float PROXIMITY_THRESHOLD = 1.0f;
@@ -93,6 +92,8 @@ public class PocketModeService extends SystemService {
 
     private static final String ALWAYS_ON_POCKET_MODE_ENABLED = "always_on_pocket_mode_enabled";
     private static final String POCKET_MODE_ENABLED = "pocket_mode_enabled";
+    private static final String BATTERY_FRIENDLY_POCKET_MODE_ENABLED = "battery_friendly_pocket_mode_enabled";
+
     private final Handler mHandler = new Handler();
     
     private static PocketModeService instance;
@@ -187,7 +188,7 @@ public class PocketModeService extends SystemService {
         }
     }
 
-    private void showOverlay() {
+    public void showOverlay() {
         if (isDozing()) return;
         final Runnable show = new Runnable() {
             @Override
@@ -206,7 +207,7 @@ public class PocketModeService extends SystemService {
         mHandler.post(show);
     }
 
-    private void hideOverlay() {
+    public void hideOverlay() {
         final Runnable hide = new Runnable() {
             @Override
             public void run() {
@@ -417,7 +418,7 @@ public class PocketModeService extends SystemService {
         });
     }
 
-    private boolean isDeviceOnKeyguard() {
+    public boolean isDeviceOnKeyguard() {
         return mKeyguardManager != null && mKeyguardManager.isKeyguardLocked();
     }
 
